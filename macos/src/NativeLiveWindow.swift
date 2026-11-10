@@ -138,9 +138,10 @@ final class NativeMetalGameView: NSView {
     // original's fullscreen pointer could not leave 800x600, and its edge-scroll
     // zones 1..8 (InitGameZone 0x471830) are only 2 px wide, so the edge pixel is
     // what it saw at the screen border. Clicks outside the surface stay ignored.
-    func mouse(_ event:NSEvent,_ message:Int,held:Bool=false) {
+    // A drag with no held press (it started outside the surface) stays rejected.
+    func mouse(_ event:NSEvent,_ message:Int,held:Bool=false,hover:Bool=false) {
         let p=convert(event.locationInWindow,from:nil)
-        guard let pixel=held || message==0x200 ? viewport?.clampedOriginalPixel(atWindowPoint:p):viewport?.originalPixel(atWindowPoint:p) else{return}
+        guard let pixel=held || hover ? viewport?.clampedOriginalPixel(atWindowPoint:p):viewport?.originalPixel(atWindowPoint:p) else{return}
         if message != 0x200{window?.makeFirstResponder(self)}
         activateKeys();synchronizeModifiers(event.modifierFlags)
         if message==0x201 || message==0x203{leftHeld=true}else if message==0x202{leftHeld=false}
@@ -156,7 +157,7 @@ final class NativeMetalGameView: NSView {
         inputEvent?(["kind":"mouse","msg":0x202,"x":lastPixel.x,"y":lastPixel.y,"wParam":0,"cancel":true])
     }
     func cancelInput(){releaseMouse();inputCancelled?()}
-    override func mouseMoved(with event:NSEvent){mouse(event,0x200)}
+    override func mouseMoved(with event:NSEvent){mouse(event,0x200,hover:true)}
     /// In fullscreen only, leaving the view through a side (the menu bar or Dock
     /// reveal) keeps the pointer on that edge, as with the original's pinned
     /// pointer. In a window the map scrolls only while the cursor is inside it
@@ -164,7 +165,7 @@ final class NativeMetalGameView: NSView {
     override func mouseExited(with event:NSEvent){
         guard window?.isKeyWindow==true,window?.styleMask.contains(.fullScreen)==true,let content=window?.contentView,
               !content.bounds.contains(content.convert(event.locationInWindow,from:nil)) else{return}
-        mouse(event,0x200,held:leftHeld)
+        mouse(event,0x200,held:leftHeld,hover:true)
     }
     /// Focus loss pulls a pointer resting in an edge-scroll zone 2 px inward, so the
     /// map does not keep scrolling while the player is in another app.

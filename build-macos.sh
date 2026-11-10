@@ -47,8 +47,10 @@ for name in NativeCampaignMenu NativeAudio NativeCDMusicDisc NativeCDMusicPlayer
             NativeViewportPolicy NativeGameSpeed NativePlayerOptions NativeBenchmarkArguments NativeDefeatMovie \
             NativeFLC NativeEventFLCPlayback NativeLiveWindow NativePlayerEdition NativeCDImport \
             NativePlayerImport NativePlayerApp SmokeReadiness main; do
-    SWIFT_SOURCES="$SWIFT_SOURCES $SRC/$name.swift"
+    SWIFT_SOURCES="$SWIFT_SOURCES $name.swift"
 done
+# Source names are relative to $SRC (no spaces), so the list may be split by the shell.
+cd "$SRC"
 # shellcheck disable=SC2086
 xcrun swiftc -swift-version 5 -O -target arm64-apple-macosx13.0 -DRISING_PLAYER_EDITION \
     -module-cache-path "$OUT/module-cache" \
@@ -56,6 +58,7 @@ xcrun swiftc -swift-version 5 -O -target arm64-apple-macosx13.0 -DRISING_PLAYER_
     -I "$ENGINE/include" -import-objc-header "$SRC/MacOSLiveDriver.h" \
     "$OBJ/macos-live-static.o" "$OBJ/macos-codec-static.o" "$OBJ/macos-audio-static.o" "$OBJ/macos-events-static.o" \
     "$STATIC" $SWIFT_SOURCES -o "$APP/Contents/MacOS/RisingLands"
+cd "$ROOT"
 
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>

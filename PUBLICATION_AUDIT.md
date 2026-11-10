@@ -4,7 +4,7 @@ Status: **this repository is private and not yet publishable.** Two blockers rem
 (section 7). This file records what was copied from the private research repository, what was left out and why, and what
 still needs the owner's review.
 
-Source: private research repository, commit `edd578d7` (macOS host with 1x = 30 frames/s and the edge-scroll fix). Files
+Source: private research repository, commit `fc95ba3f` (macOS host with 1x = 30 frames/s and the edge-scroll fix, including its drag-clamp correction). Files
 were copied into a fresh repository with no history.
 
 ## 1. What is included
@@ -13,7 +13,7 @@ were copied into a fresh repository with no history.
 |---|---|
 | `engine/` | Rust workspace: `crates/rl-core` (the engine library), `crates/rl-ffi` (the C ABI, library `rising_engine`), `include/` (C headers and ABI notes), `Cargo.toml`, `Cargo.lock`, `rust-toolchain.toml` |
 | `macos/src/` | Native macOS host: Swift (AppKit, Metal, AVFoundation), C driver and host files, headers |
-| `macos/tests/` | Standalone Swift component tests (hotkeys, viewport, game speed, player options, benchmark arguments) and `run.sh` |
+| `macos/tests/` | Standalone Swift component tests (hotkeys, viewport, game speed, player options, benchmark arguments), the production view consumer test (`ControlsConsumerTests`, no window, no game data) and `run.sh` |
 | `build-macos.sh` | Builds the engine and the player app from the repository root |
 | `docs/WINDOWS_CLIENT.md` | How to write a Windows host over the same C ABI |
 | `README.md`, `README.en.md` | Portuguese and English instructions |
