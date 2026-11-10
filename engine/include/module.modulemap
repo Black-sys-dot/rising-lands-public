@@ -1,0 +1,4 @@
+module RisingEngine {
+    header "rising_engine.h"
+    export *
+}

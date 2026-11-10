@@ -1,0 +1,12 @@
+[package]
+name = "rl-ffi"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "rising_engine"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+rl-core = { path = "../rl-core" }

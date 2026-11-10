@@ -1,0 +1,7 @@
+build/
+target/
+*.BIN
+*.CUE
+*.ISO
+*.bin
+.DS_Store

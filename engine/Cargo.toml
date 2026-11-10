@@ -1,0 +1,11 @@
+[workspace]
+members = ["crates/rl-core", "crates/rl-ffi"]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+version = "0.1.0"
+license = "UNLICENSED" # TODO: choose a license before publishing
+
+[profile.release]
+overflow-checks = true
