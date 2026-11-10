@@ -43,7 +43,7 @@ across the ABI.
 | Sound effects | `NativeAudio.swift`, `macos_audio_mapper.c` | Sound requests come from the engine's frame events (`rl_eventos_entrada` / `rl_eventos_quadro`). The samples were decoded from the CD's `.SND` banks at import |
 | CD music | `NativeCDMusicHost.swift`, `NativeCDMusicPlayer.swift`, `NativeCDMusicDisc.swift` | Tracks 2 and 3, read from the raw `.BIN` image only, at import. The engine requests play and stop as frame events (MCICD) |
 | Event pictures (FLC) and movies (AVI) | `NativeEventFLCPlayback.swift`, `NativeFLC.swift`, `macos_event_flc.inc`; `NativeDefeatMovie.swift` (intro and defeat AVI) | FLC: `rl_eventos_flc_v1`, `rl_evento_flc_estado_v1`, `rl_evento_flc_terminar_v1`. A movie ends on the Escape key-up, as in the original |
-| First-run CD import | `NativeCDImport.swift`, `NativePlayerImport.swift` | Reads the player's `.BIN`/`.CUE`/`.ISO` or CD folder, verifies by SHA-256 and writes to the user's data folder. **No game data may be bundled.** Today some derived tables are still prepared at build time (see `PUBLICATION_AUDIT.md`, section 5); a Windows client should generate them from the CD on first run |
+| First-run CD import | `NativeCDImport.swift`, `NativePlayerImport.swift` | Reads the player's `.BIN`/`.CUE`/`.ISO` or CD folder, verifies by SHA-256 and writes to the user's data folder. **No game data may be bundled.** Everything else the renderer needs is computed by the engine from these CD files (see `PUBLICATION_AUDIT.md`, section 5) |
 | Saves | `macos_live_driver.c` (`macos_live_save_begin`/`macos_live_save_commit`, `macos_live_load`, `macos_live_autosave`); menus in `NativePlayerApp.swift` | `rl_salvar_bytes`, `rl_autosalvar_bytes`, `rl_carregar_arquivo`, `rl_salvar_versao` |
 | Original menus, briefing, results, credits | `NativeCampaignMenu.swift`, `macos_campaign_shell.inc` | The shell ABI (`rl_shell_*`, `rising_shell.h`): `rl_shell_create`, `rl_shell_plan`, `rl_shell_enter`, `rl_shell_input`, `rl_shell_draw`, `rl_shell_copy`, `rl_shell_credits_frame`, `rl_shell_defeat_finish`, `rl_shell_free` |
 | Player menus (pause, speed, difficulty, keys, re-import) | `NativePlayerApp.swift` | Host UI only |
@@ -62,9 +62,12 @@ functions).
      `PLATGAME.PIE`, `MONSTRE.INI`, `TEXTES.TXT` and the stage `.ETA`. Without an events host, call `rl_missao_iniciar`.
      Then call `rl_aplicar_dificuldade`, and `rl_carregar_eventos` with `EVENTS.INI`.
    - **The original main menu:** `rl_missao_iniciar_menu_eventos_v1` with the first nine blocks.
-3. **Renderer:** `rl_game_hud_background_initialize` (from `PLATGAME.PIE`), then `rl_render_criar(world, assets[9],
-   surface, cache)`. The renderer currently also takes prepared tables (`asset7`/`asset8`, terrain cache); see
-   `PUBLICATION_AUDIT.md`.
+3. **Renderer:** `rl_game_hud_background_initialize` (from `PLATGAME.PIE`), then `rl_render_criar_cd(world, banks[7],
+   surface)` with the six CD graphics banks (`BLOCS`, `TROOPS`, `VEHICULE`, `CREATURE`, `BUILDING`, `OTHERS.CMP`) and
+   `PLATGAME.PIE`. The engine computes the shadow and lighting tables and a new game's terrain cache itself. The game
+   palette comes from `rl_mundo_paleta_jogo`, the menu shell's tables 7/8 from `rl_mundo_tabelas_sombra_luz`, and the
+   five menu backgrounds (`TITRE.PIE`, `PAGEMIS.PIE`, `PAGEMIS2.PIE`, `CREDITS.PIE`, `ECRANFIN.LZS`) from
+   `rl_shell_imagem_cd`. `rl_render_reset_cd` resets the renderer with a new game's cache.
 4. **First frame:** `rl_load_tail_entrada_v1` with the held keys, then the first draw (`rl_render_geracao`,
    `rl_render_quadro`), then `rl_autosalvar_inicio_fase`.
 5. **Every frame:** `rl_missao_tela` (screens 16 and 19 pause the stage loop), then `rl_passo_quadro_entrada` once per input
