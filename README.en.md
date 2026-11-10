@@ -63,6 +63,10 @@ Open an issue in this repository. It helps a lot to include:
 - the stage and what you were doing;
 - the message shown, if any.
 
+## License
+
+The source code in this repository is released under the MIT License (see `LICENSE`): anyone may read, use, modify and redistribute it. It covers the code only, not the original game.
+
 ## Rights
 
 Rising Lands and all its original materials (graphics, sounds, music, texts, stages, movies and executable) remain the property of their rights holders. This repository distributes none of them and grants no license to them. Players use their own copy of the CD.

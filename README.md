@@ -61,6 +61,10 @@ Abra uma *issue* neste repositório. Ajuda muito informar:
 - a fase e o que você estava fazendo;
 - a mensagem que apareceu, se houve alguma.
 
+## Licença
+
+O código deste repositório é distribuído sob a licença MIT (veja `LICENSE`): qualquer pessoa pode ler, usar, modificar e redistribuir. A licença cobre só o código; não cobre o jogo original.
+
 ## Direitos
 
 Rising Lands e todos os seus materiais originais (gráficos, sons, música, textos, fases, filmes e executável) continuam pertencendo aos seus titulares. Este repositório não distribui nenhum desses materiais e não concede licença sobre eles. O jogador usa a sua própria cópia do CD.
