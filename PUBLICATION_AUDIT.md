@@ -65,13 +65,13 @@ That is app text, not a link. It is listed here because the READMEs deliberately
 
 ## 5. The player build and the bundle (blocker: first-run generation)
 
-**Clean build check.** The repository was copied to an empty temporary folder and built with an environment that holds
+**Clean build check.** A fresh clone (into a folder whose path contains a space) was built with an environment that holds
 only `HOME` and a `PATH` for the system tools and cargo, and no project variables. `./build-macos.sh` succeeded. The
 bundle `build/RisingLands.app` contains exactly:
 
 | File | Bytes |
 |---|---:|
-| `Contents/MacOS/RisingLands` (arm64 executable: engine, host, ad hoc signature) | 5,948,048 |
+| `Contents/MacOS/RisingLands` (arm64 executable: engine, host, ad hoc signature) | 5,948,208 |
 | `Contents/Info.plist` | 1,230 |
 | `Contents/_CodeSignature/CodeResources` | 2,200 |
 
