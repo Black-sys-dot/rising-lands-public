@@ -249,6 +249,22 @@ typedef struct {
 } RlRenderObservation;
 int32_t rl_render_criar(RlMundo world,const RlRenderBytes *assets,uint32_t count,
  const RlRenderBytes *initial_surface,const RlRenderCache *initial_cache,RlRenderer *output);
+/* Player edition, everything from the CD (additive, same ABI version): the
+ * renderer from the six CMP banks and PLATGAME.PIE (count 7, rl_render_criar's
+ * first seven, in order); the shadow and lighting tables are read from the world
+ * the mission start built from the CD palette, and the terrain cache is a new
+ * game's (InitCache: keys zero, the bank's blocks 1090..1345, cursor 0). */
+int32_t rl_render_criar_cd(RlMundo world,const RlRenderBytes *banks,uint32_t count,
+ const RlRenderBytes *initial_surface,RlRenderer *output);
+/* rl_render_reset with a new game's terrain cache from the renderer's own bank. */
+int32_t rl_render_reset_cd(RlRenderer renderer,const RlRenderBytes *surface);
+/* The world's shadow and lighting tables (256 bytes each), computed from the CD palette. */
+int32_t rl_mundo_tabelas_sombra_luz(RlMundo world,uint8_t *shadow,uint8_t *light);
+/* The world's game palette loaded from PLATGAME.PIE (768 bytes, 8-bit RGB). */
+int32_t rl_mundo_paleta_jogo(RlMundo world,uint8_t *palette,uint32_t capacity);
+/* A CD shell background (TITRE.PIE, PAGEMIS.PIE, PAGEMIS2.PIE, CREDITS.PIE,
+ * ECRANFIN.LZS) decoded to 800x600 indexed pixels (capacity at least 480000). */
+int32_t rl_shell_imagem_cd(const uint8_t *file,uint32_t length,uint8_t *pixels,uint32_t capacity);
 int32_t rl_render_geracao(RlMundo world,uint64_t *generation,uint32_t *phase,uint32_t *frame);
 int32_t rl_render_quadro(RlRenderer renderer,uint64_t expected_generation,uint32_t hud_flags,
  uint8_t *indexed_buffer,uint32_t indexed_capacity,uint8_t *palette_rgb24,uint32_t palette_capacity,

@@ -58,10 +58,12 @@ The app's interface is in Brazilian Portuguese, like the original game.
 
 ## Reporting problems
 
-Open an issue in this repository. It helps a lot to include:
+Open an issue in this repository with the **Problema no jogo / Game problem** template. It helps a lot to include:
 - the macOS version and the Mac model;
 - the stage and what you were doing;
-- the message shown, if any.
+- the whole text of the stop panel, if it appeared (it names the original routine's address).
+
+Do not attach saves or game files: they may contain original game data.
 
 ## License
 

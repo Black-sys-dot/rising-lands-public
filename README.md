@@ -56,10 +56,12 @@ A imagem do CD original brasileiro está disponível no **Internet Archive**. Ba
 
 ## Problemas
 
-Abra uma *issue* neste repositório. Ajuda muito informar:
+Abra uma *issue* neste repositório com o modelo **Problema no jogo**. Ajuda muito informar:
 - a versão do macOS e o modelo do Mac;
 - a fase e o que você estava fazendo;
-- a mensagem que apareceu, se houve alguma.
+- o texto inteiro do painel de parada, se ele apareceu (ele traz o endereço da rotina do original).
+
+Não anexe saves nem arquivos do jogo: eles podem conter dados do jogo original.
 
 ## Licença
 

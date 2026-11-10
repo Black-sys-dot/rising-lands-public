@@ -344,6 +344,34 @@ pub unsafe extern "C" fn rl_render_reset(
         })
     })
 }
+/// `rl_render_reset` with a new game's terrain cache, built from the bank the
+/// renderer already holds (`Assets::initial_cache`): no host-supplied cache.
+/// # Safety
+/// `surface` points to one readable descriptor of 480000 bytes.
+#[no_mangle]
+pub unsafe extern "C" fn rl_render_reset_cd(handle: u64, surface: *const RlRenderBytes) -> i32 {
+    status(|| {
+        if surface.is_null() {
+            return Err(AbiError::InvalidArgument);
+        }
+        let surface = unsafe { input(&*surface, 480000) }?;
+        with_registry(|r| {
+            let bound = r
+                .renderers
+                .get_mut(&handle)
+                .ok_or(AbiError::InvalidHandle)?;
+            if !r.worlds.contains_key(&bound.world) {
+                return Err(AbiError::InvalidHandle);
+            }
+            let cache = bound
+                .renderer
+                .assets
+                .initial_cache()
+                .map_err(render_error)?;
+            bound.renderer.reset(surface, cache).map_err(render_error)
+        })
+    })
+}
 #[no_mangle]
 pub extern "C" fn rl_render_liberar(handle: u64) -> i32 {
     status(|| {
@@ -486,6 +514,136 @@ pub unsafe extern "C" fn rl_render_fundo_salvo(
             }
             Ok(())
         })
+    })
+}
+
+/// Player edition: the renderer from the CD's six CMP banks and PLATGAME.PIE
+/// alone (`banks`, 7 entries in the order of `rl_render_criar`'s first seven).
+/// The shadow and lighting tables come from the world's memory, where the
+/// mission start computed them from the CD palette (CalculOmbrage 0x45f940,
+/// CalculEclairage 0x45fafc at 60%: [0x4e24b4], [0x4e24b8]); `Assets::load`
+/// still checks every table against the original's SHA-256. The terrain cache
+/// is a new game's (`Assets::initial_cache`). Nothing derived from the CD is
+/// supplied by the host.
+/// # Safety
+/// `banks` points to 7 readable descriptors, `surface` to one, `output` is writable.
+#[no_mangle]
+pub unsafe extern "C" fn rl_render_criar_cd(
+    world: u64,
+    banks: *const RlRenderBytes,
+    count: u32,
+    surface: *const RlRenderBytes,
+    output: *mut u64,
+) -> i32 {
+    status(|| {
+        if count != 7 || banks.is_null() || surface.is_null() || output.is_null() {
+            return Err(AbiError::InvalidArgument);
+        }
+        let descriptors = unsafe { slice::from_raw_parts(banks, 7) };
+        let mut blobs: Vec<&[u8]> = descriptors
+            .iter()
+            .map(|b| unsafe { input(b, 16 * 1024 * 1024) })
+            .collect::<Result<_>>()?;
+        let (shadow, light) = with_world(world, |w| {
+            let m = w.render_memory()?;
+            let shadow = m.read(m.u32(0x4e24b4)?, 256)?.to_vec();
+            let light = m.read(m.u32(0x4e24b8)?, 256)?.to_vec();
+            Ok((shadow, light))
+        })?;
+        blobs.push(&shadow);
+        blobs.push(&light);
+        let assets = Arc::new(rl_core::render_assets::Assets::load(&blobs).map_err(render_error)?);
+        let cache = assets.initial_cache().map_err(render_error)?;
+        let renderer = Renderer::new(assets, unsafe { input(&*surface, 480000) }?, cache)
+            .map_err(render_error)?;
+        let handle = with_registry(|r| {
+            if !r.worlds.contains_key(&world) {
+                return Err(AbiError::InvalidHandle);
+            }
+            let handle = r.next;
+            r.next = r.next.checked_add(1).ok_or(AbiError::ResourceLimit)?;
+            r.renderers.insert(
+                handle,
+                BoundRenderer {
+                    world,
+                    renderer,
+                    spare: None,
+                },
+            );
+            Ok(handle)
+        })?;
+        unsafe { output.write(handle) };
+        Ok(())
+    })
+}
+
+/// The shadow and lighting tables the mission or menu start computed from the
+/// CD palette (CalculOmbrage 0x45f940 into [0x4e24b4], CalculEclairage 0x45fafc
+/// at 60% into [0x4e24b8]), for consumers that take them as assets 7 and 8
+/// (`rl_shell_create`). 256 bytes each.
+/// # Safety
+/// `shadow` and `light` are writable for 256 bytes each.
+#[no_mangle]
+pub unsafe extern "C" fn rl_mundo_tabelas_sombra_luz(
+    world: u64,
+    shadow: *mut u8,
+    light: *mut u8,
+) -> i32 {
+    status(|| {
+        if shadow.is_null() || light.is_null() {
+            return Err(AbiError::InvalidArgument);
+        }
+        let (s, l) = with_world(world, |w| {
+            let m = w.render_memory()?;
+            Ok((
+                m.read(m.u32(0x4e24b4)?, 256)?.to_vec(),
+                m.read(m.u32(0x4e24b8)?, 256)?.to_vec(),
+            ))
+        })?;
+        unsafe { slice::from_raw_parts_mut(shadow, 256) }.copy_from_slice(&s);
+        unsafe { slice::from_raw_parts_mut(light, 256) }.copy_from_slice(&l);
+        Ok(())
+    })
+}
+
+/// The game palette the world loaded from the CD's PLATGAME.PIE (LoadPalette
+/// 0x4798e9 into [0x4e24b0]: 6-bit components shifted to 8 bits, entry 0 black).
+/// # Safety
+/// `palette` is writable for `capacity` (at least 768) bytes.
+#[no_mangle]
+pub unsafe extern "C" fn rl_mundo_paleta_jogo(world: u64, palette: *mut u8, capacity: u32) -> i32 {
+    status(|| {
+        if palette.is_null() || capacity < 768 {
+            return Err(AbiError::InvalidArgument);
+        }
+        let rgb = with_world(world, |w| {
+            let m = w.render_memory()?;
+            Ok(m.read(m.u32(0x4e24b0)?, 768)?.to_vec())
+        })?;
+        unsafe { slice::from_raw_parts_mut(palette, 768) }.copy_from_slice(&rgb);
+        Ok(())
+    })
+}
+
+/// A shell background file of the CD (TITRE.PIE, PAGEMIS.PIE, PAGEMIS2.PIE,
+/// CREDITS.PIE or ECRANFIN.LZS) decoded to 800x600 indexed pixels.
+/// # Safety
+/// `file` is readable for `length` bytes; `pixels` writable for `capacity` (at least 480000).
+#[no_mangle]
+pub unsafe extern "C" fn rl_shell_imagem_cd(
+    file: *const u8,
+    length: u32,
+    pixels: *mut u8,
+    capacity: u32,
+) -> i32 {
+    status(|| {
+        if file.is_null() || pixels.is_null() || capacity < 480000 || length > 16 * 1024 * 1024 {
+            return Err(AbiError::InvalidArgument);
+        }
+        let bytes = unsafe { slice::from_raw_parts(file, length as usize) };
+        let decoded = rl_core::shell_picture::decode_shell_file(bytes)?;
+        unsafe { slice::from_raw_parts_mut(pixels, 480000) }.copy_from_slice(&decoded);
+        Ok(())
     })
 }
 

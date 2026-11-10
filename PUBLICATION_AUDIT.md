@@ -33,7 +33,7 @@ were copied into a fresh repository with no history.
 `engine/include/*.md` mentioned private receipt folders and one absolute path on the maintainer's machine. Those
 references were replaced by "(private research repository)".
 
-## 3. Embedded data in the engine source (blocker: needs the owner's review)
+## 3. Embedded data in the engine source (decided: kept)
 
 There is no `include_bytes!` or `include_str!`, no base64 or long hex blob, and no binary file of any kind in the repository
 (`file` reports text for every file). There are no game text strings: the only Portuguese string literals are two menu
@@ -49,9 +49,11 @@ labels in a test. Some source files, however, carry tables transcribed from `RIS
 
 Beyond these, the whole engine is a routine-by-routine transcription of the original program. Comments cite the original
 routine names (French) and their addresses, and every module holds small constants (sprite numbers, offsets, state codes)
-taken from the code. They are kept, because they document the port. Before publishing, the owner should decide whether
-these extracted tables may ship as source. If not, the alternative is to read them from the player's own `RISING.EXE` at
-startup, which the engine already receives (`mission_files.rs`).
+taken from the code. They are kept, because they document the port. **Owner's decision (2026-11-10): kept as source, with the original CD a
+requirement to play.** The three "tables" above are immediates of the original machine code (the stores of the AI table
+initializer, the arms of a `switch`, the constants of the fire-drawing routine), of the same nature as every other
+constant of the port. Reading only these three from the executable at run time would not change the nature of the code
+and would make the engine more fragile.
 
 ## 4. Hardcoded paths and personal data
 
@@ -63,51 +65,30 @@ app's import dialog.
 The app's import dialog (`macos/src/NativePlayerImport.swift`) says the CD image is on the "Internet Archive (archive.org)".
 That is app text, not a link. It is listed here because the READMEs deliberately name only "Internet Archive".
 
-## 5. The player build and the bundle (blocker: first-run generation)
+## 5. The player build and the bundle (done: nothing derived from the CD)
 
-**Clean build check.** A fresh clone (into a folder whose path contains a space) was built with an environment that holds
-only `HOME` and a `PATH` for the system tools and cargo, and no project variables. `./build-macos.sh` succeeded. The
-bundle `build/RisingLands.app` contains exactly:
+The app bundle holds the executable, `Info.plist`, the signature and `Resources/player`:
 
-| File | Bytes |
-|---|---:|
-| `Contents/MacOS/RisingLands` (arm64 executable: engine, host, ad hoc signature) | 5,948,208 |
-| `Contents/Info.plist` | 1,230 |
-| `Contents/_CodeSignature/CodeResources` | 2,200 |
+| File | What it is |
+|---|---|
+| `import-manifest.json` | Import recipes: CD file names, SHA-256 and byte counts, sound sample offsets in the `.SND` banks; plus the SHA-256 of the development-derived inputs the guard refuses (`derivedForbidden`) |
+| `bundled/*/manifest.json` | File-name and SHA-256 lists (native inputs, audio, events, movies, music) |
 
-It holds no game data. It also cannot play yet. The app expects `Contents/Resources/player/import-manifest.json`, and
-without it the import stops with "O manifesto de importação deste aplicativo é inválido".
+No game data, plain or keyed, is shipped. Everything the private build used to prepare is now computed by the engine from
+the imported CD at run time:
 
-**What the private player build bakes into the bundle today.** That build is `scripts/player_build.py` and
-`player_import.py` in the private repository. Its `Resources/player` holds:
+| Formerly shipped | Now |
+|---|---|
+| `palette.bin` | `rl_mundo_paleta_jogo`: the palette the world loads from `PLATGAME.PIE` |
+| `asset7.bin`, `asset8.bin` (shadow, lighting) | Computed by the world from the palette (CalculOmbrage, CalculEclairage at 60%); `rl_render_criar_cd`, `rl_mundo_tabelas_sombra_luz` |
+| `keys.bin`, `cache.bin`, `cursor.bin` | A new game's terrain cache: keys zeroed (InitCache), slots = the bank's own blocks 1090..1345, cursor 0 |
+| `shell-*.pixels` (5 screens) | `rl_shell_imagem_cd` decodes `TITRE.PIE`, `PAGEMIS.PIE`, `PAGEMIS2.PIE`, `CREDITS.PIE`, `ECRANFIN.LZS` |
+| `input1.bin`, `input2.bin` | The ABI host input context, built in the driver (no game data) |
 
-| Output | Kind | What it is | Produced at build time by |
-|---|---|---|---|
-| `palette.bin` (768 B) | keyed | Game palette | `GraphicsInspectionRenderer.catalog.paleta()` (Python, from the CD graphics) |
-| `asset7.bin` (256 B) | keyed | Shadow table | `test_quadro_jogo.tabelas()`: a table the original program computes at run time, captured from it in an x86 emulator |
-| `asset8.bin` (256 B) | keyed | Lighting table (PLATGAME, 60%) | Same capture |
-| `keys.bin` (1,024 B), `cache.bin` (270,336 B), `cursor.bin` (4 B) | keyed, keyed, bundled | Initial terrain sprite cache | Initial cache captured from the original program |
-| `shell-TITRE.PIE`, `shell-PAGEMIS.PIE`, `shell-PAGEMIS2.PIE`, `shell-CREDITS.PIE`, `shell-ECRANFIN.LZS` `.pixels` (480,000 B each) | keyed | Decoded menu, briefing, credits and end screens | Decoded with the engine's picture decoder (`prepare_shell_assets.py`) |
-| `input1.bin`, `input2.bin` (72 B each) | bundled | Host input structures (cursor, registers) for the first frames | Built from a session that ran the original start-up; **needs review** |
-| `shell-assets.json`, `manifest.json` and the audio, music, movies and events manifests | bundled | File names, sizes and SHA-256 hashes | Metadata only |
-
-"Keyed" outputs are stored XOR a SHA-256 keystream keyed by the player's `RISING.EXE`, so they are noise without the CD.
-They are still derived from the game. Under the rule "nothing derived from the CD inside the app", they must go.
-
-**What must change.** The import (`macos/src/NativeCDImport.swift`, recipes from the import manifest) must compute these
-outputs from the imported CD on first run, instead of unmasking shipped blobs:
-
-1. `palette.bin`: read the palette from the CD's palette files, as the engine's catalog already does.
-2. `asset7.bin` / `asset8.bin`: port the original routines that build the shadow and lighting tables, or have the engine
-   compute them at world creation from the palette and `PLATGAME.PIE`.
-3. `keys.bin` / `cache.bin` / `cursor.bin`: let the renderer build its initial terrain cache itself (`rl_render_criar` takes
-   them as inputs today).
-4. `shell-*.pixels`: decode `TITRE.PIE`, `PAGEMIS.PIE`, `PAGEMIS2.PIE`, `CREDITS.PIE` and `ECRANFIN.LZS` with the engine's
-   picture decoder at import.
-5. `input1.bin` / `input2.bin`: replace with a documented default input structure (cursor 400,300) if their content is
-   confirmed to need no captured state.
-
-Then the import manifest holds only recipes and hashes, and `build-macos.sh` can generate and ship it.
+`engine/crates/rl-core/tests/cd_derived_assets.rs` (runs with `RL_CD_ROOT`) proves the computed palette, tables, shell
+pictures and cache blocks equal, byte for byte, the inputs the private build used to prepare. In the private repository
+the packaged build passes its 229 consumer tests and 10/10 UI smokes with this design, including the player edition
+importing the real CD and opening the original menu.
 
 ## 6. What the app reads from the imported CD (already the case)
 
@@ -126,10 +107,10 @@ In all, 125 files are copied, 551 samples decoded and 2 audio tracks read: about
 
 ## 7. Before making this repository public
 
-1. **License:** choose one (`engine/Cargo.toml` says `UNLICENSED`, with a TODO).
-2. **Section 3:** the owner decides whether the transcribed tables may ship, or whether they move to run-time reading from
-   the player's `RISING.EXE`.
-3. **Section 5:** implement first-run generation, so a build from this repository plays with nothing derived from the CD
-   in the bundle.
-4. Review `input1.bin`/`input2.bin` and the app's dialog text (section 4).
-5. Release identity: bundle identifier (`local.risinglands.ptbr.player` is a placeholder), Developer ID and notarization.
+1. License: done (MIT for the code, `LICENSE`).
+2. Section 3: decided (kept; the CD is required).
+3. Section 5: done (nothing derived from the CD in the bundle).
+4. The owner's review of this audit and of the file list.
+5. Release identity: the bundle identifier (`local.risinglands.ptbr.player` is a placeholder, overridable with
+   `RISING_BUNDLE_ID`), the Developer ID signature (`RISING_SIGN_IDENTITY`) and notarization.
+6. The app's import dialog still writes "Internet Archive (archive.org)"; the READMEs name only the Internet Archive.

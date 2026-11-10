@@ -14,6 +14,7 @@ TARGET="$OUT/engine-target"
 OBJ="$OUT/obj"
 APP="$OUT/RisingLands.app"
 VERSION=${RISING_VERSION:-0.1.0}
+BUNDLE_ID=${RISING_BUNDLE_ID:-local.risinglands.ptbr.player}
 BUILD_NUMBER=${RISING_BUILD_NUMBER:-1}
 REVISION=$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)
 
@@ -66,7 +67,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <plist version="1.0">
 <dict>
   <key>CFBundleExecutable</key><string>RisingLands</string>
-  <key>CFBundleIdentifier</key><string>local.risinglands.ptbr.player</string>
+  <key>CFBundleIdentifier</key><string>$BUNDLE_ID</string>
   <key>CFBundleName</key><string>Rising Lands</string>
   <key>CFBundleDisplayName</key><string>Rising Lands</string>
   <key>CFBundlePackageType</key><string>APPL</string>
@@ -86,6 +87,17 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
-codesign --force --sign - --options runtime --timestamp=none "$APP"
+echo "==> CD import recipes (metadata only: CD file names, SHA-256, sample offsets)"
+mkdir -p "$APP/Contents/Resources/player"
+cp -R "$ROOT/macos/player/." "$APP/Contents/Resources/player/"
+
+# Ad hoc by default. Set RISING_SIGN_IDENTITY (for example "Developer ID Application: Name (TEAMID)")
+# to sign for distribution: hardened runtime and a secure timestamp, as notarization requires.
+SIGN_IDENTITY=${RISING_SIGN_IDENTITY:--}
+if [ "$SIGN_IDENTITY" = "-" ]; then
+    codesign --force --sign - --options runtime --timestamp=none "$APP"
+else
+    codesign --force --sign "$SIGN_IDENTITY" --options runtime --timestamp "$APP"
+fi
 codesign --verify --deep --strict "$APP"
 echo "==> $APP"

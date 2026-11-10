@@ -1,0 +1,55 @@
+name: "Problema no jogo / Game problem"
+description: "O jogo parou, travou, desenhou errado ou se comportou diferente do original. / The game stopped, froze, drew wrongly or behaved unlike the original."
+labels: ["bug", "playtest"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Obrigado por testar! Um problema por issue. Não anexe arquivos do CD nem capturas de arquivos do jogo extraídos; prints da tela são bem-vindos.
+        Thanks for testing! One problem per issue. Do not attach CD files or extracted game files; screenshots are welcome.
+  - type: dropdown
+    id: kind
+    attributes:
+      label: "Tipo / Kind"
+      options:
+        - "Painel de parada (o jogo mostrou um relatório e parou) / Stop panel (the game showed a report and stopped)"
+        - "Travou ou fechou sozinho / Froze or crashed"
+        - "Desenho ou som errado / Wrong picture or sound"
+        - "Regra do jogo diferente do original / Game rule differs from the original"
+        - "Importação do CD / CD import"
+        - "Outro / Other"
+    validations:
+      required: true
+  - type: input
+    id: stage
+    attributes:
+      label: "Fase e dificuldade / Stage and difficulty"
+      placeholder: "MONDE07, Normal"
+  - type: textarea
+    id: what
+    attributes:
+      label: "O que você estava fazendo / What you were doing"
+      description: "Passos para chegar ao problema, o que esperava e o que aconteceu. / Steps to reach it, what you expected and what happened."
+    validations:
+      required: true
+  - type: textarea
+    id: stop
+    attributes:
+      label: "Texto do painel de parada / Stop panel text"
+      description: "Se apareceu o painel, copie o texto inteiro (ele tem o endereço da rotina do original). / If the stop panel appeared, paste its whole text (it names the original routine's address)."
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: "Versão do app / App version"
+      description: "Menu Rising Lands → Sobre o Rising Lands (mostra o commit). / Rising Lands menu → Sobre o Rising Lands (shows the commit)."
+  - type: input
+    id: mac
+    attributes:
+      label: "Mac e macOS"
+      placeholder: "MacBook Air M2, macOS 15.1"
+  - type: markdown
+    attributes:
+      value: |
+        Não anexe saves nem arquivos do jogo: eles podem conter dados do jogo original. Descreva os passos para reproduzir.
+        Do not attach saves or game files: they may contain original game data. Describe the steps to reproduce instead.

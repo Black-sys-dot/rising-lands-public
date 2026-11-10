@@ -125,3 +125,39 @@ pub fn pie(file: &[u8], surface: &mut [u8], stride: usize) -> Result<u32> {
     }
     Ok(last_edx)
 }
+
+/// A shell background file of the CD (`TITRE.PIE`, `PAGEMIS.PIE`, `PAGEMIS2.PIE`,
+/// `CREDITS.PIE` or `ECRANFIN.LZS`) decoded to 800x600 indexed pixels, as the
+/// prepared-shell consumer shows it. `.LZS`: the LZSS envelope (`LZSS`, `FORM`
+/// at 780, size at 784, payload at 788) through `lzss`; the original ring's
+/// retained 18-byte tail does not change these pictures (checked with the original,
+/// all-zero and all-0xff tails), so a zero ring stands in. `.PIE`: `pie` at stride 800.
+pub fn decode_shell_file(file: &[u8]) -> Result<Vec<u8>> {
+    let mut pixels = vec![0u8; 480000];
+    if file.get(..4) == Some(b"LZSS") {
+        let invalid = crate::EngineError::UndeclaredAccess {
+            address: 784,
+            size: 4,
+        };
+        if file.get(780..784) != Some(b"FORM") {
+            return stop("LZSS shell envelope", 0x45a659);
+        }
+        let size = u32::from_le_bytes(file.get(784..788).ok_or(invalid)?.try_into().unwrap());
+        let payload = file
+            .get(788..788usize.saturating_add(size as usize))
+            .ok_or(crate::EngineError::UndeclaredAccess {
+                address: 788,
+                size: size as usize,
+            })?
+            .to_vec();
+        let mut m = MemoriaJogo::from_blocks([
+            (0x1000000, payload),
+            (RING, vec![0u8; 4096]),
+            (0x4000000, pixels),
+        ])?;
+        lzss(&mut m, 0x1000000, 0x4000000, size)?;
+        return Ok(m.read(0x4000000, 480000)?.to_vec());
+    }
+    pie(file, &mut pixels, 800)?;
+    Ok(pixels)
+}

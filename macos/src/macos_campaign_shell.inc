@@ -6,15 +6,17 @@ static int shell_copy_picture(MacOSLiveDriver*d){
 }
 static int shell_paint(MacOSLiveDriver*d){
  RlShellPlan plan={0};int c=d->rl_shell_plan(d->shell,d->shell_mode,&plan);if(c)return c;
+ /* The background is decoded from the CD's own file (imported unchanged). */
  const char*name=NULL;
- if(!strcmp((char*)plan.background,"\\ecranfin.lzs"))name="shell-ECRANFIN.LZS.pixels";
- else if(!strcmp((char*)plan.background,"\\pagemis2.pie"))name="shell-PAGEMIS2.PIE.pixels";
- else if(!strcmp((char*)plan.background,"\\pagemis.pie"))name="shell-PAGEMIS.PIE.pixels";
- else if(!strcmp((char*)plan.background,"\\titre.pie"))name="shell-TITRE.PIE.pixels";
- else if(!strcmp((char*)plan.background,"\\credits.pie"))name="shell-CREDITS.PIE.pixels";
+ if(!strcmp((char*)plan.background,"\\ecranfin.lzs"))name="ECRANFIN.LZS";
+ else if(!strcmp((char*)plan.background,"\\pagemis2.pie"))name="PAGEMIS2.PIE";
+ else if(!strcmp((char*)plan.background,"\\pagemis.pie"))name="PAGEMIS.PIE";
+ else if(!strcmp((char*)plan.background,"\\titre.pie"))name="TITRE.PIE";
+ else if(!strcmp((char*)plan.background,"\\credits.pie"))name="CREDITS.PIE";
  if(!name)return RL_UNSUPPORTED_PATH;
- uint32_t n=0;uint8_t*p=file(d->root,name,&n);
- if(!p||n!=480000){free(p);snprintf(d->save_error,sizeof(d->save_error),"Fundo original ausente ou inválido: %s",name);return RL_IO_ERROR;}
+ uint32_t fn=0,n=480000;uint8_t*f=file(d->root,name,&fn),*p=malloc(480000);
+ c=f&&p?d->rl_shell_imagem_cd(f,fn,p,480000):RL_IO_ERROR;free(f);
+ if(c){free(p);snprintf(d->save_error,sizeof(d->save_error),"Fundo original ausente ou inválido: %s",name);return RL_IO_ERROR;}
  c=d->rl_shell_paint_prepared(d->shell,d->shell_generation,(RlShellBytes){p,n},&d->shell_generation);free(p);
  return c?c:shell_copy_picture(d);
 }
@@ -53,6 +55,12 @@ static int shell_open(MacOSLiveDriver*d,uint32_t mode){
  RlShellBytes assets[11]={0};uint8_t*owned[11]={0};uint32_t n=0;char name[40];RlShell shell=0;int c=0;
  for(unsigned i=0;i<11;i++){
   if(i<9)snprintf(name,sizeof(name),"asset%u.bin",i);else snprintf(name,sizeof(name),"%s",i==9?"MENU.CMP":"INVENTE.CMP");
+  if(d->cd_inputs&&(i==7||i==8)){
+   /* Shadow and lighting tables: computed by the world from the CD palette. */
+   if(i==7){owned[7]=malloc(256);owned[8]=malloc(256);if(!owned[7]||!owned[8]){c=RL_IO_ERROR;goto done;}
+    c=d->rl_mundo_tabelas_sombra_luz(d->world,owned[7],owned[8]);if(c)goto done;}
+   assets[i]=(RlShellBytes){owned[i],256};continue;
+  }
   owned[i]=file(d->root,name,&n);assets[i]=(RlShellBytes){owned[i],n};if(!owned[i]){c=RL_IO_ERROR;goto done;}
  }
  c=d->rl_shell_create(1,d->world,assets,11,(RlShellBytes){d->pixels,480000},&shell);

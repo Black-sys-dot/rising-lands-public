@@ -130,6 +130,30 @@ impl Assets {
             .get(id.wrapping_sub(1) as usize)
             .ok_or(Error::Invalid("sprite ID outside original catalog"))
     }
+    /// The terrain cache as a new game finds it, built from the CD's bank alone:
+    /// ProgInit's LoadSTRATBank leaves the slot payloads as the bank's own raw
+    /// 32x33 blocks of IDs 1090..1345 (GetNumBob overwrites them in place later),
+    /// InitCache 0x40fa38 (MenuNewSelect 0x42c6a8, CalculGame 0x42d1ef) zeroes the
+    /// 256 four-byte keys, and the cursor 0x49a04e starts as its .bss zero.
+    pub fn initial_cache(&self) -> Result<super::render::Cache> {
+        let mut raw = Vec::with_capacity(270336);
+        for id in 1090..1346 {
+            let s = self.sprite(id)?;
+            if (s.width, s.height, s.raw.len()) != (32, 32, 1056) {
+                return Err(Error::Invalid(
+                    "cached bank block outside the 32x32 raw domain",
+                ));
+            }
+            raw.extend_from_slice(&s.raw);
+        }
+        let cache = super::render::Cache {
+            keys: vec![0; 1024],
+            raw,
+            cursor: 0,
+        };
+        cache.validate()?;
+        Ok(cache)
+    }
 }
 
 // SHA-256, FIPS 180-4. Used only at creation; rendering retains the verified bytes.

@@ -41,6 +41,7 @@ struct MacOSLiveDriver {
  FN(rl_liberar_mundo); FN(rl_projetar_tudo); FN(rl_erro_mensagem);
  FN(rl_render_contrato); FN(rl_render_criar); FN(rl_render_geracao); FN(rl_render_quadro); FN(rl_render_liberar);
  FN(rl_render_reset);FN(rl_game_hud_background_version);FN(rl_game_hud_background_initialize);
+ FN(rl_render_criar_cd);FN(rl_render_reset_cd);FN(rl_mundo_paleta_jogo);FN(rl_shell_imagem_cd);FN(rl_mundo_tabelas_sombra_luz);
  FN(rl_salvar_versao);FN(rl_salvar_arquivo);FN(rl_salvar_bytes);FN(rl_carregar_arquivo);FN(rl_render_cache);
  FN(rl_autosalvar_inicio_fase);FN(rl_autosalvar_arquivo);FN(rl_autosalvar_bytes);
  FN(rl_entrada_quantidade_pendente);FN(rl_entrada_passo_pendente);
@@ -62,6 +63,9 @@ struct MacOSLiveDriver {
  char *root;char save_error[512];uint8_t *stage_presentation;uint32_t save_capacity;
  int32_t stage_cursor_x,stage_cursor_y;
  int validation,production_input;
+ /* Menu and mission worlds: every presentation input comes from the CD files
+  * (no prepared palette, tables, terrain cache or shell pictures). */
+ int cd_inputs;
  uint8_t *texts;uint32_t text_length;int texts_loaded;
  QueuedInput pending[4096];uint32_t pending_count,input_next_phase;
  MacOSInputMessage frame_messages[4096];MacOSInputKey frame_keys[256];MacOSDeclaredInput frame_input;
@@ -160,6 +164,7 @@ static int game_background(MacOSLiveDriver*d,const uint8_t*pie,uint32_t length){
 static int reset_game_surface(MacOSLiveDriver*d){
  if(d->game_surface)return 0;
  int c=game_background(d,NULL,0);if(c)return c;
+ if(d->cd_inputs){RlRenderBytes surface={d->game_background,480000};c=d->rl_render_reset_cd(d->renderer,&surface);if(!c){memcpy(d->pixels,d->game_background,480000);d->game_surface=1;}return c;}
  uint32_t n=0,cn=0;uint8_t*keys=file(d->root,"keys.bin",&n);RlRenderBytes kd={keys,n};
  uint8_t*raw=file(d->root,"cache.bin",&n);RlRenderBytes rd={raw,n};uint8_t*cursor=file(d->root,"cursor.bin",&cn);
  RlRenderBytes surface={d->game_background,480000};RlRenderCache cache={kd,rd,cursor&&cn==4?le(cursor):UINT32_MAX};
@@ -167,7 +172,24 @@ static int reset_game_surface(MacOSLiveDriver*d){
  free(keys);free(raw);free(cursor);
  if(!c){memcpy(d->pixels,d->game_background,480000);d->game_surface=1;}return c;
 }
+static int new_renderer_cd(MacOSLiveDriver*d,RlMundo world,const uint8_t*presentation,RlRenderer*out){
+ RlRenderBytes assets[7]={0};uint8_t*back[7]={0};char name[40];uint32_t n=0;int c=1;
+ for(unsigned i=0;i<7;i++){snprintf(name,sizeof(name),"asset%u.bin",i);back[i]=file(d->root,name,&n);assets[i]=(RlRenderBytes){back[i],n};if(!back[i])goto done;}
+ if(presentation){
+  /* A saved presentation carries its own surface and terrain cache. */
+  RlRenderBytes sd={presentation,480000};
+  RlRenderCache cache={{presentation+480000,1024},{presentation+481024,270336},le(presentation+751360)};
+  c=d->rl_render_criar_cd(world,assets,7,&sd,out);
+  if(!c){c=d->rl_render_reset(*out,&sd,&cache);if(c)d->rl_render_liberar(*out);}
+ }else{
+  c=game_background(d,back[6],assets[6].length);
+  if(!c){RlRenderBytes sd={d->game_background,480000};c=d->rl_render_criar_cd(world,assets,7,&sd,out);}
+  if(!c){memcpy(d->pixels,d->game_background,480000);d->game_surface=1;}
+ }
+ done:for(unsigned i=0;i<7;i++)free(back[i]);return c;
+}
 static int new_renderer(MacOSLiveDriver*d,RlMundo world,const uint8_t*presentation,RlRenderer*out){
+ if(d->cd_inputs)return new_renderer_cd(d,world,presentation,out);
  RlRenderBytes assets[9]={0};uint8_t*back[9]={0};char name[40];uint32_t n=0;int c=1;
  for(unsigned i=0;i<9;i++){snprintf(name,sizeof(name),"asset%u.bin",i);back[i]=file(d->root,name,&n);assets[i]=(RlRenderBytes){back[i],n};if(!back[i])goto done;}
  uint8_t*surface=file(d->root,"surface.bin",&n);RlRenderBytes sd={surface,n};
@@ -234,6 +256,7 @@ if(host){
  LOAD(rl_execucao_definir);LOAD(rl_execucao_modo);LOAD(rl_versao);LOAD(rl_criar_mundo);LOAD(rl_carregar_blocos);LOAD(rl_carregar_textos);LOAD(rl_passo_quadro);LOAD(rl_liberar_mundo);LOAD(rl_load_tail_entrada_v1);LOAD(rl_passo_quadro_entrada);LOAD(rl_eventos_entrada);LOAD(rl_projetar_tudo);LOAD(rl_erro_mensagem);
  LOAD(rl_render_contrato);LOAD(rl_render_criar);LOAD(rl_render_geracao);LOAD(rl_render_quadro);LOAD(rl_render_liberar);
  LOAD(rl_render_reset);LOAD(rl_game_hud_background_version);LOAD(rl_game_hud_background_initialize);
+ LOAD(rl_render_criar_cd);LOAD(rl_render_reset_cd);LOAD(rl_mundo_paleta_jogo);LOAD(rl_shell_imagem_cd);LOAD(rl_mundo_tabelas_sombra_luz);
  LOAD(rl_salvar_versao);LOAD(rl_salvar_arquivo);LOAD(rl_salvar_bytes);LOAD(rl_carregar_arquivo);LOAD(rl_render_cache);LOAD(rl_autosalvar_inicio_fase);LOAD(rl_autosalvar_arquivo);LOAD(rl_autosalvar_bytes);
  LOAD(rl_entrada_quantidade_pendente);LOAD(rl_entrada_passo_pendente);
  LOAD(rl_shell_version);LOAD(rl_shell_create);LOAD(rl_shell_plan);LOAD(rl_shell_enter);LOAD(rl_shell_paint_prepared);LOAD(rl_shell_input);LOAD(rl_shell_draw);LOAD(rl_shell_copy);LOAD(rl_shell_free);LOAD(rl_shell_campaign_prepare);LOAD(rl_shell_campaign_load);LOAD(rl_shell_defeat_finish);LOAD(rl_shell_export_world);
@@ -241,10 +264,13 @@ if(host){
  if(d->rl_salvar_versao()!=RL_SAVE_FORMAT_VERSION){snprintf(error,capacity,"Save extension v1 required");goto bad;}
  if(d->rl_game_hud_background_version()!=RL_GAME_HUD_BACKGROUND_VERSION){snprintf(error,capacity,"Gameplay background extension v1 required");goto bad;}
  if((d->rl_versao()>>16)!=1||(d->rl_versao()&0xffff)<6||d->rl_render_contrato()!=0x10009){snprintf(error,capacity,"ABI1.6 / Graphics1.9 required");goto bad;}
- uint32_t n=0;int c=0;uint8_t*in=file(root,"input1.bin",&n);
- if(!in||n!=sizeof(d->input)){free(in);snprintf(error,capacity,"Missing WinMain input1.bin");goto bad;}memcpy(&d->input,in,n);free(in);
- d->cursor_x=d->input.cursor_x;d->cursor_y=d->input.cursor_y;
- in=file(root,"input2.bin",&n);if(!in||n!=sizeof(d->phase2)){free(in);goto bad;}memcpy(&d->phase2,in,n);free(in);
+ uint32_t n=0;int c=0;uint8_t*in=NULL;
+ /* The ABI's host input context (no game data): the original WinMain entry
+  * registers before load_tail (phase 1) and between frames (phase 2), the
+  * offscreen surface binding and the message slot. Formerly input1/input2.bin. */
+ d->input=(RlFrameInput){0,0,0x60076000u,{1,0,0,0,0,0,0,0x2007ec0u},{0,0,0},{0x3000000u,0,0,0}};
+ d->phase2=(RlFrameInput){0,0,0x60076000u,{0,3,0,0x2007fe8u,0,0,0,0x2007fe8u},{0,0,0},{0x3000000u,0,0,0}};
+ d->cursor_x=d->input.cursor_x;d->cursor_y=d->input.cursor_y;d->cd_inputs=mission||menu;
  if(mission){
   if(d->rl_missao_versao()!=1){snprintf(error,capacity,"Mission extension v1 required");goto bad;}
   const char*names[]={"RISING.EXE","RISING.INI","RISING.RUL","RISING.SBL","TABLEAU.COL","COULEUR.MAP","PLATGAME.PIE","MONSTRE.INI","TEXTES.TXT",mission};
@@ -290,13 +316,20 @@ uint8_t*s0=file(root,"s0.bin",&n);if(!s0){snprintf(error,capacity,"Missing S0");
  for(uint32_t i=0;i<count;i++){if((uint64_t)off+8>n){free(s0);free(blocks);goto bad;}blocks[i].address=le(s0+off);blocks[i].length=le(s0+off+4);off+=8;if((uint64_t)off+blocks[i].length>n){free(s0);free(blocks);goto bad;}blocks[i].data=s0+off;off+=blocks[i].length;}
  c=d->rl_criar_mundo(0x10006,20,0,&d->world);if(!c)c=d->rl_carregar_blocos(d->world,blocks,count);free(blocks);free(s0);if(c){fail(d,c,"S0");snprintf(error,capacity,"%s",d->status.message);goto bad;}
  }
+ /* asset0..5 are the CD's six CMP banks and asset6 its PLATGAME.PIE; the
+  * prepared tables 7/8 and cache are read only on the historical S0 path. */
+ unsigned asset_count=d->cd_inputs?7:9;
  RlRenderBytes assets[9]={0};uint8_t*back[9]={0};char name[40];
- for(unsigned i=0;i<9;i++){snprintf(name,sizeof(name),"asset%u.bin",i);back[i]=file(root,name,&n);assets[i]=(RlRenderBytes){back[i],n};if(!back[i]){for(unsigned j=0;j<=i;j++)free(back[j]);goto bad;}}
- uint8_t*surface=file(root,"surface.bin",&n);RlRenderBytes sd={surface,n};uint8_t*keys=file(root,"keys.bin",&n);RlRenderBytes kd={keys,n};uint8_t*payloads=file(root,"cache.bin",&n);RlRenderBytes pd={payloads,n};
- uint32_t cursor_size=0;uint8_t*cursor=file(root,"cursor.bin",&cursor_size);RlRenderCache cache={kd,pd,cursor&&cursor_size==4?le(cursor):UINT32_MAX};
+ for(unsigned i=0;i<asset_count;i++){snprintf(name,sizeof(name),"asset%u.bin",i);back[i]=file(root,name,&n);assets[i]=(RlRenderBytes){back[i],n};if(!back[i]){for(unsigned j=0;j<=i;j++)free(back[j]);goto bad;}}
+ uint8_t*surface=NULL,*keys=NULL,*payloads=NULL,*cursor=NULL;RlRenderBytes sd={0};RlRenderCache cache={0};
+ if(!d->cd_inputs){
+  surface=file(root,"surface.bin",&n);sd=(RlRenderBytes){surface,n};keys=file(root,"keys.bin",&n);RlRenderBytes kd={keys,n};payloads=file(root,"cache.bin",&n);RlRenderBytes pd={payloads,n};
+  uint32_t cursor_size=0;cursor=file(root,"cursor.bin",&cursor_size);cache=(RlRenderCache){kd,pd,cursor&&cursor_size==4?le(cursor):UINT32_MAX};
+ }
  c=0;
  if(!d->validation){c=game_background(d,back[6],assets[6].length);if(!c)sd=(RlRenderBytes){d->game_background,480000};}
- if(!c&&!menu){if(sd.data&&keys&&payloads&&cursor)c=d->rl_render_criar(d->world,assets,9,&sd,&cache,&d->renderer);else c=1;}
+ if(!c&&!menu&&d->cd_inputs)c=sd.data?d->rl_render_criar_cd(d->world,assets,7,&sd,&d->renderer):1;
+ else if(!c&&!menu){if(sd.data&&keys&&payloads&&cursor)c=d->rl_render_criar(d->world,assets,9,&sd,&cache,&d->renderer);else c=1;}
  if(!c&&!menu&&sd.length==480000){memcpy(d->pixels,sd.data,480000);d->game_surface=!d->validation;}
  free(surface);free(keys);free(payloads);free(cursor);for(unsigned i=0;i<9;i++)free(back[i]);
  if(c){fail(d,c,"renderer create");snprintf(error,capacity,"%s",d->status.message);goto bad;}
@@ -306,7 +339,8 @@ uint8_t*s0=file(root,"s0.bin",&n);if(!s0){snprintf(error,capacity,"Missing S0");
  d->state_hashes=file(root,"states.bin",&n);if(!d->state_hashes||n%32||n<257*32)goto bad;d->state_count=n/32;d->audit_limit=257;
  d->surface_hashes=file(root,"surfaces.bin",&n);if(!d->surface_hashes||n%32||n<128*32)goto bad;d->surface_count=n/32;
  }
- in=file(root,"palette.bin",&n);if(!in||n!=768){free(in);goto bad;}memcpy(d->palette,in,768);free(in);
+ if(d->cd_inputs){c=d->rl_mundo_paleta_jogo(d->world,d->palette,768);if(c){fail(d,c,"paleta do jogo");snprintf(error,capacity,"%s",d->status.message);goto bad;}}
+ else{in=file(root,"palette.bin",&n);if(!in||n!=768){free(in);goto bad;}memcpy(d->palette,in,768);free(in);}
  d->texts=file(root,"TEXTES.TXT",&d->text_length);
  if(menu){c=shell_open(d,RL_SHELL_MAIN);if(c){snprintf(error,capacity,"%s",d->save_error[0]?d->save_error:"Menu original indisponível");goto bad;}}
  return d;
@@ -665,8 +699,9 @@ int32_t macos_live_load(MacOSLiveDriver*d,const char*path){
   * pause menu resumes play (the app reopens that menu on the next frame). */
  uint32_t paused=0;if(!c&&d->rl_missao_tela(world,&paused))paused=0;
  if(!c&&paused==16){
-  uint32_t pn=0;uint8_t*base=file(d->root,"palette.bin",&pn);
-  if(!base||pn!=768)c=RL_IO_ERROR;else{memcpy(pixels,view,480000);memcpy(palette,base,768);}free(base);
+  if(d->cd_inputs){c=d->rl_mundo_paleta_jogo(world,palette,768);if(!c)memcpy(pixels,view,480000);}
+  else{uint32_t pn=0;uint8_t*base=file(d->root,"palette.bin",&pn);
+  if(!base||pn!=768)c=RL_IO_ERROR;else{memcpy(pixels,view,480000);memcpy(palette,base,768);}free(base);}
  }
  free(view);
  if(!c&&paused!=16)c=d->rl_render_quadro(renderer,gen,1,pixels,sizeof(d->pixels),palette,sizeof(d->palette),&rendered);
