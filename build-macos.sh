@@ -88,8 +88,11 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 PLIST
 
 echo "==> CD import recipes (metadata only: CD file names, SHA-256, sample offsets)"
-mkdir -p "$APP/Contents/Resources/player"
-cp -R "$ROOT/macos/player/." "$APP/Contents/Resources/player/"
+# The recipe manifest is shared with the Windows client; the bundled hash
+# manifests stay beside the app resources it reads.
+mkdir -p "$APP/Contents/Resources/import-recipes" "$APP/Contents/Resources/player"
+cp "$ROOT/assets/import-recipes/import-manifest.json" "$APP/Contents/Resources/import-recipes/"
+cp -R "$ROOT/macos/player/bundled/." "$APP/Contents/Resources/player/bundled/"
 
 # Ad hoc by default. Set RISING_SIGN_IDENTITY (for example "Developer ID Application: Name (TEAMID)")
 # to sign for distribution: hardened runtime and a secure timestamp, as notarization requires.

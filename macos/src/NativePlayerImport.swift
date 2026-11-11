@@ -11,7 +11,10 @@ enum NativePlayerData {
     }
     static var data: URL { folder.appendingPathComponent("Dados", isDirectory: true) }
     static var resources: URL { Bundle.main.resourceURL!.appendingPathComponent("player", isDirectory: true) }
-    static var manifest: URL { resources.appendingPathComponent("import-manifest.json") }
+    /// The recipe manifest is shared with the Windows client (`assets/import-recipes`).
+    static var manifest: URL {
+        Bundle.main.resourceURL!.appendingPathComponent("import-recipes/import-manifest.json")
+    }
     static var ready: Bool { NativeCDImport.installed(manifestURL: manifest, folder: folder) }
 
     /// `RisingLands --import-only SOURCE [--data-dir FOLDER]`: imports without any

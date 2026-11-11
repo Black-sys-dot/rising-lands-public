@@ -586,6 +586,26 @@ pub fn decode(bytes: &[u8]) -> SaveResult<(World, ResumeState)> {
     Ok((world, ResumeState { input, pending }))
 }
 
+/// Opens the destination directory so its metadata can be synced. On Windows
+/// `File::open` on a directory fails without `FILE_FLAG_BACKUP_SEMANTICS`.
+#[cfg(windows)]
+fn sync_parent_dir(parent: &Path) -> SaveResult<()> {
+    use std::os::windows::fs::OpenOptionsExt;
+    const FILE_FLAG_BACKUP_SEMANTICS: u32 = 0x0200_0000;
+    fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(FILE_FLAG_BACKUP_SEMANTICS)
+        .open(parent)?
+        .sync_all()?;
+    Ok(())
+}
+
+#[cfg(not(windows))]
+fn sync_parent_dir(parent: &Path) -> SaveResult<()> {
+    fs::File::open(parent)?.sync_all()?;
+    Ok(())
+}
+
 /// Atomic replacement in the destination directory; sync before rename. Failed writes
 /// keep the previous slot. A directory sync error after rename is reported to the caller.
 pub fn write_file(path: &Path, bytes: &[u8]) -> SaveResult<()> {
@@ -616,7 +636,7 @@ pub fn write_file(path: &Path, bytes: &[u8]) -> SaveResult<()> {
         file.sync_all()?;
         drop(file);
         fs::rename(&temporary, path)?;
-        fs::File::open(parent)?.sync_all()?;
+        sync_parent_dir(parent)?;
         Ok(())
     })();
     if result.is_err() {
